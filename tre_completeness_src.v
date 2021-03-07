@@ -9,3 +9,5 @@ Fixpoint sem (M : nat -> Prop) (A : form) :=
     | And A1 A2 => (sem M A1) /\ (sem M A2)
     | Or A1 A2 => (sem M A1) \/ (sem M A2)
   end.
+
+Definition ctx := list form.

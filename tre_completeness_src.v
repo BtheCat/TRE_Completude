@@ -39,20 +39,27 @@ Inductive provable : context -> form -> Prop :=
 
 (*Definition valid M A := forall (M : nat -> Prop) (A : form), sem M A.*)
 
-Notation "p 'INCL' q" := (forall R, included p R -> included q R) (at level 70).
-Notation "'forallI' q 'INCL' p , P" := (forall q, q INCL p -> P q) (at level 200).
+Notation "p 'INCL' q" := (forall R, included p R -> included q R) (at level 70, q at next level).
+Notation "'forallI' q 'INCL' p , P" := (forall q, q INCL p -> P q) (at level 200, q at level 69, p at level 69).
 
 Lemma refl_incl :
   forall p, p INCL p.
 Proof.
   auto.
-Qed.
+Defined.
+
+Lemma trans_incl :
+  forall {p q r}, p INCL q -> q INCL r -> p INCL r.
+Proof.
+  auto.
+Defined.
 
 Forcing Translate nat using context included.
 Forcing Translate form using context included.
 
 Forcing Definition sem : forall (M : nat -> Prop) (A : form), Prop using context included.
-exact (fun p M A p0 Hincl => (* Hincl : preuve de p0 INCL p *)
+Proof.
+  exact (fun p M A p0 Hincl => (* Hincl : preuve de p0 INCL p *)
     (fix sem p1 Hincl1 A := (* Hincl1 : preuve de p1 INCL p *)
       match A with
       | Atomeᶠ _ n   => M p1 Hincl1 n p1 (refl_incl p1)
@@ -71,6 +78,15 @@ Forcing Translate context using context included.
 Forcing Translate In using context included.
 Forcing Translate provable using context included.
 
-Forcing Translate and using context included.
-Forcing Definition completeness : forall A, (valid A -> provable nil A) /\ (provable nil A -> valid A) using context included.
+Axiom psi : forall { p }, formᶠ p -> form.
 
+(*Forcing Translate and using context included.*)
+Forcing Definition completeness : forall A, valid A -> provable nil A using context included.
+Proof.
+  intros. 
+
+  specialize H with (p0 := p) (α := refl_incl p). simpl in H. fold (refl_incl p) in H.
+  unfold refl_incl at 1 in H. unfold validᶠ in H.
+  specialize H with (M := fun (p0 : context) Hinclp0 (n : forallI p INCL p0, natᶠ) p1 Hinclp1 => provable p1 (psi (A p1 (trans_incl Hinclp1 Hinclp0))) ).
+
+  simpl.

@@ -117,7 +117,7 @@ Proof.
   ).
 Qed.
 
-Lemma psi_form : forall { p }, (forallI p0 INCL p, formᶠ) -> form.
+Lemma psi_form : forall { p }, formᶠ p -> form.
 Proof.
   exact (fun p A =>
     (fix psi_rec A := 
@@ -125,7 +125,7 @@ Proof.
       | Atomeᶠ _ n    => Atome (psi_nat n) 
       | Andᶠ _ A1 A2  => And (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       (*| Orᶠ _ A1 A2   => Or (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))*)
-      end) (A p (refl_incl p)) 
+      end) A
   ).
 Defined.
 
@@ -140,11 +140,19 @@ Proof.
   ).
 Defined.
 
-Lemma id_form : forall { p } A, phi_form (psi_form A) = A p (refl_incl p).
+Lemma id_form : forall { p : context } (A : formᶠ p), phi_form (psi_form A) = A.
 Proof.
+  refine (fun p A =>
+    (fix id_rec p A : phi_form (psi_form A) = A := 
+      match A with
+        | Atomeᶠ _ n => _ 
+        | Andᶠ _ A1 A2 => _ 
+      end) p A 
+  ).
+  simpl.
 Admitted.
 
-Print provableᶠ.
+Print formᶠ.
 
 (*Lemma psi_provable : forall p M A, provableᶠ p M A -> provable (M) (psi_form (A p (refl_incl p))).
 Proof.
@@ -184,10 +192,13 @@ Lemma phi_model : forall (M : context -> nat -> Prop),
 Proof.
   exact (fun M p (p0 : context) Hinclp0 (n : forallI p INCL p0, natᶠ) p1 Hinclp1 
       => M p1 (psi_nat n) ).
-Qed.
+Defined.
 
 (*Axiom psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) (fun p1 _ => phi_form A) p0 Hinclp0 -> semK M p A.*)
-Axiom psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) A p0 Hinclp0 -> semK M nil (psi_form A).
+Lemma psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) A p0 Hinclp0 -> semK M nil (psi_form A).
+Proof.
+  compute in *. 
+Admitted.
 
 Lemma phi_context : forall { p }, context -> contextᶠ p p (refl_incl p).
 Proof.
@@ -201,32 +212,23 @@ Proof.
   ).
 Defined.
 
-Lemma phi_provable : forall { p ctx A }, provable ctx (psi_form A) -> provableᶠ p (fun p0 Hincl => (phi_context ctx) ) A.
+Lemma phi_provable : forall { ctx A }, provable ctx (psi_form A) -> provableᶠ nil (fun p0 Hincl => (phi_context ctx) ) A.
 Proof.
   intros. inversion_clear H.
   - apply Axᶠ. intros. induction H0.
-    * simpl. Set Printing All. apply (In_cons_yesᶠ p0 (fun (p : context) (α0 : p INCL p0) =>
-    A p (fun (R : context) (k : extend p R) => α R (α0 R k)))). 
+    * simpl. Set Printing All. (*apply (In_cons_yesᶠ p0 (fun (p : context) (α0 : p INCL p0) =>
+    A p (fun (R : context) (k : extend p R) => α R (α0 R k)))). *)
 Admitted.
 
 
 (*Forcing Translate and using context included.*)
-Forcing Definition completeness : forall A, valid A -> provable nil A using context extend.
+Forcing Definition completeness : forall A, valid A -> provable nil A using context extend from nil.
 Proof.
   intros. 
 
-  specialize H with (p0 := p) (α := refl_incl p). simpl in H. fold (refl_incl p) in H.
-  unfold refl_incl at 1 in H. unfold validᶠ in H.
+  specialize H with (p := nil) (α := refl_incl nil). 
+  unfold validᶠ in H.
   specialize H with (M := phi_model K0). 
 
-  simpl.
-
-  apply psi_sem in H . apply reify in H.
-  change (provableᶠ p
-    (fun (p0 : context) (_ : p0 INCL p) =>
-     nilᶠ p0
-       (fun (p1 : context) (_ : p1 INCL p0) (p2 : context) (_ : p2 INCL p1) =>
-        formᶠ p2))
-      A
-  ).
-  change (provable nil (psi_form A)) in H.
+  apply psi_sem, reify, phi_provable in H . assumption.
+Qed.

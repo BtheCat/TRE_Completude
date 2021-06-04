@@ -10,15 +10,6 @@ Inductive form :=
   | Or : form -> form -> form.
   *)
 
-(*
-Fixpoint sem (M : nat -> Prop) (A : form) :=
-  match A with
-    | Atome n   => M n
-    | And A1 A2 => (sem M A1) /\ (sem M A2)
-    | Or A1 A2  => (sem M A1) \/ (sem M A2)
-  end.
-*)
-
 Definition context := list form.
 
 Inductive included : context -> context -> Prop :=
@@ -49,8 +40,6 @@ Fixpoint semK (K : context -> nat -> Prop) (ctx : context) (A : form) :=
     | And A1 A2 => ((semK K ctx A1) * (semK K ctx A2))%type
     (*| Or A1 A2  => (semK K ctx A1) \/ (semK K ctx A2)*)
   end.
-
-(*Definition valid M A := forall (M : nat -> Prop) (A : form), sem M A.*)
 
 Notation "p 'INCL' q" := (forall R, extend p R -> extend q R) (at level 70, q at next level).
 Notation "'forallI' q 'INCL' p , P" := (forall q, q INCL p -> P q) (at level 200, q at level 69, p at level 69).
@@ -84,6 +73,7 @@ Defined.
 
 Print natᶠ.
 
+(*Definition valid M A := forall (M : nat -> Prop) (A : form), sem M A.*)
 Definition valid A := forall (M : nat -> Prop), sem M A.
 Forcing Translate valid using context extend.
 
@@ -93,7 +83,7 @@ Forcing Translate context using context extend.
 Forcing Translate In using context extend.
 Forcing Translate provable using context extend.
 
-Lemma psi_nat : forall { p }, (forallI p0 INCL p, natᶠ) -> nat.
+Lemma psi_nat : forall { p }, natᶠ p -> nat.
 Proof.
   exact (fun p n =>
     (fix psi_nat_rec n := 
@@ -101,11 +91,11 @@ Proof.
       | Oᶠ _    => O 
       | Sᶠ _ m  => S (psi_nat_rec (m p (refl_incl p)))
       end 
-    ) (n p (refl_incl p)) 
+    ) n
   ).
-Qed.
+Defined.
 
-Lemma phi_nat : forall (p : context), nat -> natᶠ p.
+Lemma phi_nat : forall { p : context }, nat -> natᶠ p.
 Proof.
   exact (fun p n =>
     (fix phi_nat_rec p n :=
@@ -115,14 +105,27 @@ Proof.
       end 
     ) p n 
   ).
-Qed.
+Defined.
+
+Lemma id_nat : forall (p : context) (n : natᶠ p), phi_nat (psi_nat n) = n.
+Proof.
+  refine (fun p n =>
+    (fix id_nat_rec p n : phi_nat (psi_nat n) = n :=
+      match n with
+        | Oᶠ _ => _ 
+        | Sᶠ _ m => _ 
+      end) p n 
+  ).
+  - reflexivity.
+  - simpl. f_equal. 
+Admitted. 
 
 Lemma psi_form : forall { p }, formᶠ p -> form.
 Proof.
   exact (fun p A =>
     (fix psi_rec A := 
       match A with 
-      | Atomeᶠ _ n    => Atome (psi_nat n) 
+      | Atomeᶠ _ n    => Atome (psi_nat (n p (refl_incl p))) 
       | Andᶠ _ A1 A2  => And (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       (*| Orᶠ _ A1 A2   => Or (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))*)
       end) A
@@ -134,7 +137,7 @@ Proof.
   exact (fun p A => 
     (fix phi_form_rec p A :=
       match A with 
-      | Atome n => Atomeᶠ p (fun p0 _ => phi_nat p0 n)
+      | Atome n => Atomeᶠ p (fun p0 _ => phi_nat n)
       | And A1 A2 => Andᶠ p (fun p0 _ => phi_form_rec p0 A1) (fun p0 _ => phi_form_rec p0 A2) 
       end) p A 
   ).
@@ -149,10 +152,11 @@ Proof.
         | Andᶠ _ A1 A2 => _ 
       end) p A 
   ).
-  simpl.
+  - simpl. f_equal. (* apply id_nat. *)
 Admitted.
 
 Print formᶠ.
+Print listᶠ.
 
 (*Lemma psi_provable : forall p M A, provableᶠ p M A -> provable (M) (psi_form (A p (refl_incl p))).
 Proof.
@@ -183,7 +187,7 @@ Print contextᶠ.
 Lemma psi_model : forall { p : context } (M : forall p0 : context, p0 INCL p ->
   (forallI p1 INCL p0, natᶠ) -> forall p1 : context, p1 INCL p0 -> Prop), context -> nat -> Prop.
 Proof.
-  exact (fun p M ctx n => M p (refl_incl p) (fun p0 _ => (phi_nat p0 n)) p (refl_incl p)).
+  exact (fun p M ctx n => M p (refl_incl p) (fun p0 _ => (phi_nat n)) p (refl_incl p)).
 Qed.
 
 Lemma phi_model : forall (M : context -> nat -> Prop), 
@@ -191,11 +195,11 @@ Lemma phi_model : forall (M : context -> nat -> Prop),
     (forallI p1 INCL p0, natᶠ) -> forall p1 : context, p1 INCL p0 -> Prop.
 Proof.
   exact (fun M p (p0 : context) Hinclp0 (n : forallI p INCL p0, natᶠ) p1 Hinclp1 
-      => M p1 (psi_nat n) ).
+      => M p1 (psi_nat (n p1 Hinclp1)) ).
 Defined.
 
 (*Axiom psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) (fun p1 _ => phi_form A) p0 Hinclp0 -> semK M p A.*)
-Lemma psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) A p0 Hinclp0 -> semK M nil (psi_form A).
+Lemma psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) A p0 Hinclp0 -> semK M nil (psi_form (A p (refl_incl p))).
 Proof.
   compute in *. 
 Admitted.
@@ -212,11 +216,11 @@ Proof.
   ).
 Defined.
 
-Lemma phi_provable : forall { ctx A }, provable ctx (psi_form A) -> provableᶠ nil (fun p0 Hincl => (phi_context ctx) ) A.
+Lemma phi_provable : forall { ctx A }, provable ctx (psi_form A) -> provableᶠ nil (fun p0 Hincl => (phi_context ctx) ) ( fun p0 Hincl => phi_form (psi_form (p:=ctx) A) ).
 Proof.
   intros. inversion_clear H.
-  - apply Axᶠ. intros. induction H0.
-    * simpl. Set Printing All. (*apply (In_cons_yesᶠ p0 (fun (p : context) (α0 : p INCL p0) =>
+  - apply Axᶠ. intros. (*induction H0.
+    * simpl. Set Printing All.*) (*apply (In_cons_yesᶠ p0 (fun (p : context) (α0 : p INCL p0) =>
     A p (fun (R : context) (k : extend p R) => α R (α0 R k)))). *)
 Admitted.
 
@@ -230,5 +234,5 @@ Proof.
   unfold validᶠ in H.
   specialize H with (M := phi_model K0). 
 
-  apply psi_sem, reify, phi_provable in H . assumption.
+  apply psi_sem, reify, phi_provable in H. rewrite id_form in H. assumption.
 Qed.

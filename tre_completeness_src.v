@@ -158,16 +158,6 @@ Admitted.
 Print formᶠ.
 Print listᶠ.
 
-(*Lemma psi_provable : forall p M A, provableᶠ p M A -> provable (M) (psi_form (A p (refl_incl p))).
-Proof.
-  exact (fun p M A prov =>
-    (fix psi_prov_rec prov :=
-      match prov with
-      | Axᶠ
-    )
-  ).
-Admitted.*)
-
 (* Modèle universel *)
 Definition K0 ctx n := provable ctx (Atome n).
 
@@ -198,7 +188,6 @@ Proof.
       => M p1 (psi_nat (n p1 Hinclp1)) ).
 Defined.
 
-(*Axiom psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) (fun p1 _ => phi_form A) p0 Hinclp0 -> semK M p A.*)
 Lemma psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) A p0 Hinclp0 -> semK M nil (psi_form (A p (refl_incl p))).
 Proof.
   compute in *. 
@@ -224,8 +213,6 @@ Proof.
     A p (fun (R : context) (k : extend p R) => α R (α0 R k)))). *)
 Admitted.
 
-
-(*Forcing Translate and using context included.*)
 Forcing Definition completeness : forall A, valid A -> provable nil A using context extend from nil.
 Proof.
   intros. 

@@ -61,10 +61,10 @@ Forcing Translate form using context extend.
 
 Forcing Definition sem : forall (M : nat -> Prop) (A : form), Prop using context extend.
 Proof.
-  exact (fun p M A p0 Hincl => (* Hincl : preuve de p0 INCL p *)
+  exact (fun p M A => (* Hincl : preuve de p0 INCL p *)
     (fix sem p1 Hincl1 A := (* Hincl1 : preuve de p1 INCL p *)
       match A with
-      | Atomeᶠ _ n   => M p1 Hincl1 n p1 (refl_incl p1)
+      | Atomeᶠ _ n   => M p1 Hincl1 n
       | Andᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) /\ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
       (*| Orᶠ _ A1 A2  => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) \/ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))*)
     end) p (refl_incl p) (A p (refl_incl p)) 
@@ -182,21 +182,21 @@ Qed.
 
 Lemma phi_model : forall (M : context -> nat -> Prop), 
   forall { p : context }, forall p0 : context, p0 INCL p ->
-    (forallI p1 INCL p0, natᶠ) -> forall p1 : context, p1 INCL p0 -> Prop.
+    (forallI p1 INCL p0, natᶠ) -> Prop.
 Proof.
-  exact (fun M p (p0 : context) Hinclp0 (n : forallI p INCL p0, natᶠ) p1 Hinclp1 
-      => M p1 (psi_nat (n p1 Hinclp1)) ).
+  exact (fun M p (p0 : context) Hinclp0 (n : forallI p INCL p0, natᶠ)
+      => M p0 (psi_nat (n p0 (refl_incl p0))) ).
 Defined.
 
-Lemma psi_sem : forall { p M A p0 Hinclp0 }, semᶠ p (phi_model M) A p0 Hinclp0 -> semK M nil (psi_form (A p (refl_incl p))).
+Lemma psi_sem : forall { p M A }, semᶠ p (phi_model M) A -> semK M nil (psi_form (A p (refl_incl p))).
 Proof.
   compute in *. 
 Admitted.
 
-Lemma phi_context : forall { p }, context -> contextᶠ p p (refl_incl p).
+Lemma phi_context : forall { p }, context -> contextᶠ p.
 Proof.
   exact (fun p ctx =>
-    (fix phi_ctx_rec p ctx : contextᶠ p p (refl_incl p) :=
+    (fix phi_ctx_rec p ctx : contextᶠ p :=
       match ctx with 
       | [] => nilᶠ p _
       | A :: ctx' => consᶠ p _ (fun p1 _ => phi_form A) (fun p1 _ => phi_ctx_rec p1 ctx')
@@ -221,5 +221,5 @@ Proof.
   unfold validᶠ in H.
   specialize H with (M := phi_model K0). 
 
-  apply psi_sem, reify, phi_provable in H. rewrite id_form in H. assumption.
+  apply psi_sem, reify, phi_provable in H. assumption.
 Qed.

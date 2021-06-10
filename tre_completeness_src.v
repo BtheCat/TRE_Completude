@@ -5,19 +5,18 @@ Import ListNotations.
 
 Inductive form :=
   | Atome : nat -> form
-  | And : form -> form -> form.
+  | And : form -> form -> form
+  | Implies : form -> form -> form.
   (*
   | Or : form -> form -> form.
   *)
 
 Definition context := list form.
 
-Inductive included : context -> context -> Prop :=
-  | included_nil : included nil nil
-  | included_cons_no : forall A ctx ctx', included ctx ctx' -> included ctx (cons A ctx')
-  | included_cons_yes : forall A ctx ctx', included ctx ctx' -> included (cons A ctx) (cons A ctx').
-
-Definition extend (ctx ctx' : context) := included ctx' ctx.
+Inductive extend : context -> context -> Prop :=
+  | extend_nil : extend nil nil
+  | extend_cons_no : forall A ctx ctx', extend ctx ctx' -> extend (cons A ctx) ctx'
+  | extend_cons_yes : forall A ctx ctx', extend ctx ctx' -> extend (cons A ctx) (cons A ctx').
 
 Inductive In (A : form) : context -> Prop :=
   | In_cons_yes : forall ctx, In A (cons A ctx)
@@ -27,17 +26,27 @@ Inductive provable : context -> form -> Prop :=
   | Ax { ctx A } : In A ctx -> provable ctx A
   | AndI { ctx A B } : provable ctx A -> provable ctx B -> provable ctx (And A B)
   | AndE1 { ctx A B } : provable ctx (And A B) -> provable ctx A
-  | AndE2 { ctx A B } : provable ctx (And A B) -> provable ctx B.
+  | AndE2 { ctx A B } : provable ctx (And A B) -> provable ctx B
+  | ImpliesI { ctx A B } : provable (cons A ctx) B -> provable ctx (Implies A B)
+  | ImpliesE { ctx A B } : provable ctx (Implies A B) -> provable ctx A -> provable ctx B.
   (*
   | OrI1 ctx A B : provable ctx A -> provable ctx (Or A B)
   | OrI2 ctx A B : provable ctx B -> provable ctx (Or A B)
   | OrE ctx A B : forall C, provable ctx (Or A B) -> provable (cons A ctx) C -> provable (cons B ctx) C -> provable ctx C.
   *)
 
+Lemma compatibility_extend_provable :
+  forall { A ctx ctx' }, extend ctx' ctx -> provable ctx A -> provable ctx' A.
+Proof.
+  intros A ctx ctx' Hextend Hprovable.
+  induction Hprovable.
+Admitted.
+
 Fixpoint semK (K : context -> nat -> Prop) (ctx : context) (A : form) :=
   match A with
     | Atome n   => K ctx n 
     | And A1 A2 => ((semK K ctx A1) * (semK K ctx A2))%type
+    | Implies A1 A2 => forall ctx', extend ctx' ctx -> (semK K ctx' A1) -> (semK K ctx' A2)
     (*| Or A1 A2  => (semK K ctx A1) \/ (semK K ctx A2)*)
   end.
 
@@ -49,6 +58,14 @@ Lemma refl_incl :
 Proof.
   auto.
 Defined.
+
+Lemma id_extend :
+  forall p, extend p p.
+Proof.
+  intros. induction p.
+  - apply extend_nil.
+  - apply extend_cons_yes. assumption.  
+Qed.
 
 Lemma trans_incl :
   forall {p q r}, p INCL q -> q INCL r -> p INCL r.
@@ -67,6 +84,7 @@ Proof.
       | Atomeᶠ _ n   => M p1 Hincl1 n
       | Andᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) /\ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
       (*| Orᶠ _ A1 A2  => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) \/ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))*)
+      | Impliesᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) -> (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
     end) p (refl_incl p) (A p (refl_incl p)) 
   ).
 Defined.
@@ -128,6 +146,7 @@ Proof.
       | Atomeᶠ _ n    => Atome (psi_nat (n p (refl_incl p))) 
       | Andᶠ _ A1 A2  => And (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       (*| Orᶠ _ A1 A2   => Or (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))*)
+      | Impliesᶠ _ A1 A2 => Implies (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       end) A
   ).
 Defined.
@@ -139,17 +158,22 @@ Proof.
       match A with 
       | Atome n => Atomeᶠ p (fun p0 _ => phi_nat n)
       | And A1 A2 => Andᶠ p (fun p0 _ => phi_form_rec p0 A1) (fun p0 _ => phi_form_rec p0 A2) 
+      | Implies A1 A2 => Impliesᶠ p (fun p0 _ => phi_form_rec p0 A1) (fun p0 _ => phi_form_rec p0 A2)
       end) p A 
   ).
 Defined.
 
-Lemma id_form : forall { p : context } (A : formᶠ p), phi_form (psi_form A) = A.
+Axiom extensionality : forall (A : Type) (B : A -> Type), ( forall { f g : forall a : A, B a }, ( forall x : A, f x = g x ) -> f = g ).
+
+Lemma id_form : forall { p : context } A, ( fun p' Hincl => phi_form (p:=p') (psi_form (A p (refl_incl p))) ) = A.
 Proof.
+  intros. apply extensionality. intro ctx. apply extensionality.
   refine (fun p A =>
-    (fix id_rec p A : phi_form (psi_form A) = A := 
+    (fix id_rec p A : phi_form (psi_form (A _ _)) = A _ _ := 
       match A with
         | Atomeᶠ _ n => _ 
         | Andᶠ _ A1 A2 => _ 
+        | Impliesᶠ _ A1 A2 => _
       end) p A 
   ).
   - simpl. f_equal. (* apply id_nat. *)
@@ -165,11 +189,13 @@ Fixpoint reify p A : semK K0 p A -> provable p A :=
   match A with 
     | Atome n   => (fun v => v)
     | And A1 A2 => (fun '(v1, v2) => AndI (reify p A1 v1) (reify p A2 v2))
+    | Implies A1 A2 => (fun v => ImpliesI (reify (A1 :: p) A2 (v (A1 :: p) (extend_cons_no A1 p p (id_extend p)) (reflect (A1 :: p) A1 (Ax (In_cons_yes A1 p))))))
   end 
 with reflect p A : provable p A -> semK K0 p A :=
   match A with 
     | Atome n   => (fun t => t)
     | And A1 A2 => (fun t => (reflect p A1 (AndE1 t), reflect p A2 (AndE2 t)))
+    | Implies A1 A2 => (fun t => (fun p0 Hinclp0 a => reflect p0 A2 (ImpliesE (compatibility_extend_provable Hinclp0 t) (reify p0 A1 a))))
   end.
 
 Print contextᶠ.
@@ -221,5 +247,5 @@ Proof.
   unfold validᶠ in H.
   specialize H with (M := phi_model K0). 
 
-  apply psi_sem, reify, phi_provable in H. assumption.
+  apply psi_sem, reify, phi_provable in H. simpl. unfold refl_incl in H. assumption.
 Qed.

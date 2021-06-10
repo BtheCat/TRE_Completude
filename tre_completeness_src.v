@@ -167,7 +167,7 @@ Axiom extensionality : forall (A : Type) (B : A -> Type), ( forall { f g : foral
 
 Lemma id_form : forall { p : context } A, ( fun p' Hincl => phi_form (p:=p') (psi_form (A p (refl_incl p))) ) = A.
 Proof.
-  intros. apply extensionality. intro ctx. apply extensionality.
+  (*intros. apply extensionality. intro ctx. apply extensionality.
   refine (fun p A =>
     (fix id_rec p A : phi_form (psi_form (A _ _)) = A _ _ := 
       match A with
@@ -176,7 +176,7 @@ Proof.
         | Impliesᶠ _ A1 A2 => _
       end) p A 
   ).
-  - simpl. f_equal. (* apply id_nat. *)
+  - simpl. f_equal. (* apply id_nat. *)*)
 Admitted.
 
 Print formᶠ.

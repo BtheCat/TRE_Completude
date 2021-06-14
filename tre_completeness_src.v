@@ -7,9 +7,6 @@ Inductive form :=
   | Atome : nat -> form
   | And : form -> form -> form
   | Implies : form -> form -> form.
-  (*
-  | Or : form -> form -> form.
-  *)
 
 Definition context := list form.
 
@@ -29,23 +26,40 @@ Inductive provable : context -> form -> Prop :=
   | AndE2 { ctx A B } : provable ctx (And A B) -> provable ctx B
   | ImpliesI { ctx A B } : provable (cons A ctx) B -> provable ctx (Implies A B)
   | ImpliesE { ctx A B } : provable ctx (Implies A B) -> provable ctx A -> provable ctx B.
-  (*
-  | OrI1 ctx A B : provable ctx A -> provable ctx (Or A B)
-  | OrI2 ctx A B : provable ctx B -> provable ctx (Or A B)
-  | OrE ctx A B : forall C, provable ctx (Or A B) -> provable (cons A ctx) C -> provable (cons B ctx) C -> provable ctx C.
-  *)
+
+Lemma trans_in :
+  forall A ctx ctx', extend ctx' ctx -> In A ctx -> In A ctx'.
+Proof.
+  intros A ctx ctx'. intros Hextend Hin.  
+  induction Hextend. 
+  - assumption.
+  - apply IHHextend in Hin. apply In_cons_no. assumption.
+  - apply In_cons_no. apply IHHextend. 
+Admitted.
 
 Lemma compatibility_extend_provable :
   forall { A ctx ctx' }, extend ctx' ctx -> provable ctx A -> provable ctx' A.
 Proof.
-Admitted.
+  intros A ctx ctx' Hextend Hprovable.
+  induction Hprovable in ctx', Hextend.
+  - apply Ax. apply trans_in with (ctx:=ctx) ; assumption.
+  - apply AndI. 
+    * apply IHHprovable1. assumption. 
+    * apply IHHprovable2. assumption. 
+  - apply IHHprovable in Hextend. apply AndE1 in Hextend. assumption.
+  - apply IHHprovable in Hextend. apply AndE2 in Hextend. assumption.
+  - apply ImpliesI. specialize IHHprovable with (cons A ctx'). 
+    apply IHHprovable. apply extend_cons_yes. assumption.
+  - assert (HextendBis : extend ctx' ctx). assumption. 
+    apply IHHprovable1 in Hextend. apply IHHprovable2 in HextendBis.
+    apply @ImpliesE with (A:=A) ; assumption.
+Qed.
 
 Fixpoint semK (K : context -> nat -> Prop) (ctx : context) (A : form) :=
   match A with
     | Atome n   => K ctx n 
     | And A1 A2 => ((semK K ctx A1) * (semK K ctx A2))%type
     | Implies A1 A2 => forall ctx', extend ctx' ctx -> (semK K ctx' A1) -> (semK K ctx' A2)
-    (*| Or A1 A2  => (semK K ctx A1) \/ (semK K ctx A2)*)
   end.
 
 Notation "p 'INCL' q" := (forall R, extend p R -> extend q R) (at level 70, q at next level).
@@ -76,18 +90,15 @@ Forcing Translate form using context extend.
 
 Forcing Definition sem : forall (M : nat -> Prop) (A : form), Prop using context extend.
 Proof.
-  exact (fun p M A => (* Hincl : preuve de p0 INCL p *)
+  exact (fun p M A => 
     (fix sem p1 Hincl1 A := (* Hincl1 : preuve de p1 INCL p *)
       match A with
       | Atomeᶠ _ n   => M p1 Hincl1 n
       | Andᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) /\ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
-      (*| Orᶠ _ A1 A2  => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) \/ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))*)
       | Impliesᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) -> (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
     end) p (refl_incl p) (A p (refl_incl p)) 
   ).
 Defined.
-
-Print natᶠ.
 
 Definition valid A := forall (M : nat -> Prop), sem M A.
 Forcing Translate valid using context extend.
@@ -129,7 +140,6 @@ Proof.
       match A with 
       | Atomeᶠ _ n    => Atome (psi_nat n) 
       | Andᶠ _ A1 A2  => And (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
-      (*| Oriᶠ _ A1 A2   => Or (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))*)
       | Impliesᶠ _ A1 A2 => Implies (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       end) (A p (refl_incl p))
   ).
@@ -162,8 +172,6 @@ with reflect p A : provable p A -> semK K0 p A :=
     | And A1 A2 => (fun t => (reflect p A1 (AndE1 t), reflect p A2 (AndE2 t)))
     | Implies A1 A2 => (fun t => (fun p0 Hinclp0 a => reflect p0 A2 (ImpliesE (compatibility_extend_provable Hinclp0 t) (reify p0 A1 a))))
   end.
-
-Print contextᶠ.
 
 Lemma psi_model : forall { p : context } (M : forall p0 : context, p0 INCL p ->
   (forallI p1 INCL p0, natᶠ) -> Prop), context -> nat -> Prop.

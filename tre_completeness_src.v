@@ -35,11 +35,30 @@ Inductive provable : context -> form -> Prop :=
   | OrE ctx A B : forall C, provable ctx (Or A B) -> provable (cons A ctx) C -> provable (cons B ctx) C -> provable ctx C.
   *)
 
+Lemma trans_in :
+  forall A ctx ctx', extend ctx' ctx -> In A ctx -> In A ctx'.
+Proof.
+  intros A ctx ctx'. intros Hextend Hin.
+  induction Hextend.
+  - assumption.
+  - apply IHHextend in Hin. apply In_cons_no. assumption.
+  - apply In_cons_no. apply IHHextend. 
+Admitted.
+
 Lemma compatibility_extend_provable :
   forall { A ctx ctx' }, extend ctx' ctx -> provable ctx A -> provable ctx' A.
 Proof.
   intros A ctx ctx' Hextend Hprovable.
   induction Hprovable.
+  - apply Ax. apply trans_in with (ctx:=ctx) ; assumption.
+  - apply AndI. 
+    * apply IHHprovable1. assumption. 
+    * apply IHHprovable2. assumption. 
+  - apply IHHprovable in Hextend. apply AndE1 in Hextend. assumption.
+  - apply IHHprovable in Hextend. apply AndE2 in Hextend. assumption.
+  - apply ImpliesI. admit. 
+  - assert (HextendBis : extend ctx' ctx). assumption. apply IHHprovable1 in Hextend. apply IHHprovable2 in HextendBis.
+    (*apply ImpliesE with (A:=A) ; assumption.*)
 Admitted.
 
 Fixpoint semK (K : context -> nat -> Prop) (ctx : context) (A : form) :=
@@ -50,11 +69,11 @@ Fixpoint semK (K : context -> nat -> Prop) (ctx : context) (A : form) :=
     (*| Or A1 A2  => (semK K ctx A1) \/ (semK K ctx A2)*)
   end.
 
-Notation "p 'INCL' q" := (forall R, extend p R -> extend q R) (at level 70, q at next level).
-Notation "'forallI' q 'INCL' p , P" := (forall q, q INCL p -> P q) (at level 200, q at level 69, p at level 69).
+Notation "p 'EXT' q" := (forall R, extend p R -> extend q R) (at level 70, q at next level).
+Notation "'forallI' q 'EXT' p , P" := (forall q, q EXT p -> P q) (at level 200, q at level 69, p at level 69).
 
 Lemma refl_incl :
-  forall p, p INCL p.
+  forall p, p EXT p.
 Proof.
   auto.
 Defined.
@@ -68,7 +87,7 @@ Proof.
 Qed.
 
 Lemma trans_incl :
-  forall {p q r}, p INCL q -> q INCL r -> p INCL r.
+  forall { p q r }, p EXT q -> q EXT r -> p EXT r.
 Proof.
   auto.
 Defined.
@@ -78,7 +97,7 @@ Forcing Translate form using context extend.
 
 Forcing Definition sem : forall (M : nat -> Prop) (A : form), Prop using context extend.
 Proof.
-  exact (fun p M A => (* Hincl : preuve de p0 INCL p *)
+  exact (fun p M A =>
     (fix sem p1 Hincl1 A := (* Hincl1 : preuve de p1 INCL p *)
       match A with
       | Atomeᶠ _ n   => M p1 Hincl1 n
@@ -200,17 +219,17 @@ with reflect p A : provable p A -> semK K0 p A :=
 
 Print contextᶠ.
 
-Lemma psi_model : forall { p : context } (M : forall p0 : context, p0 INCL p ->
-  (forallI p1 INCL p0, natᶠ) -> forall p1 : context, p1 INCL p0 -> Prop), context -> nat -> Prop.
+Lemma psi_model : forall { p : context } (M : forall p0 : context, p0 EXT p ->
+  (forallI p1 EXT p0, natᶠ) -> Prop), context -> nat -> Prop.
 Proof.
-  exact (fun p M ctx n => M p (refl_incl p) (fun p0 _ => (phi_nat n)) p (refl_incl p)).
+  exact (fun p M ctx n => M p (refl_incl p) (fun p0 _ => (phi_nat n))).
 Qed.
 
 Lemma phi_model : forall (M : context -> nat -> Prop), 
-  forall { p : context }, forall p0 : context, p0 INCL p ->
-    (forallI p1 INCL p0, natᶠ) -> Prop.
+  forall { p : context }, forall p0 : context, p0 EXT p ->
+    (forallI p1 EXT p0, natᶠ) -> Prop.
 Proof.
-  exact (fun M p (p0 : context) Hinclp0 (n : forallI p INCL p0, natᶠ)
+  exact (fun M p (p0 : context) Hinclp0 (n : forallI p EXT p0, natᶠ)
       => M p0 (psi_nat (n p0 (refl_incl p0))) ).
 Defined.
 

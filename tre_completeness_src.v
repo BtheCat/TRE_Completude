@@ -173,11 +173,13 @@ with reflect p A : provable p A -> semK K0 p A :=
     | Implies A1 A2 => (fun t => (fun p0 Hinclp0 a => reflect p0 A2 (ImpliesE (compatibility_extend_provable Hinclp0 t) (reify p0 A1 a))))
   end.
 
+(*
 Lemma psi_model : forall { p : context } (M : forall p0 : context, p0 INCL p ->
   (forallI p1 INCL p0, natᶠ) -> Prop), context -> nat -> Prop.
 Proof.
   exact (fun p M ctx n => M p (refl_incl p) (fun p0 _ => (phi_nat p0 n))).
 Qed.
+*)
 
 Lemma phi_model : forall (M : context -> nat -> Prop), 
   forall { p : context }, forall p0 : context, p0 INCL p ->

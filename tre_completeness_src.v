@@ -5,7 +5,7 @@ Require Import Program.
 Import ListNotations.
 
 Inductive form :=
-  | Atome : nat -> form
+  | Atom : nat -> form
   | And : form -> form -> form
   | Implies : form -> form -> form.
 
@@ -60,7 +60,7 @@ Qed.
 
 Fixpoint semK (K : context -> nat -> Prop) (ctx : context) (A : form) :=
   match A with
-    | Atome n   => K ctx n 
+    | Atom n   => K ctx n 
     | And A1 A2 => ((semK K ctx A1) * (semK K ctx A2))%type
     | Implies A1 A2 => forall ctx', extend ctx' ctx -> (semK K ctx' A1) -> (semK K ctx' A2)
   end.
@@ -96,7 +96,7 @@ Proof.
   exact (fun p M A => 
     (fix sem p1 Hincl1 A := (* Hincl1 : preuve de p1 INCL p *)
       match A with
-      | Atomeᶠ _ n   => M p1 Hincl1 n
+      | Atomᶠ _ n   => M p1 Hincl1 n
       | Andᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) /\ (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
       | Impliesᶠ _ A1 A2 => (sem p1 Hincl1 (A1 p1 (refl_incl p1))) -> (sem p1 Hincl1 (A2 p1 (refl_incl p1)))
     end) p (refl_incl p) (A p (refl_incl p)) 
@@ -141,7 +141,7 @@ Proof.
   exact (fun p A =>
     (fix psi_rec A := 
       match A with 
-      | Atomeᶠ _ n    => Atome (psi_nat n) 
+      | Atomᶠ _ n    => Atom (psi_nat n) 
       | Andᶠ _ A1 A2  => And (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       | Impliesᶠ _ A1 A2 => Implies (psi_rec (A1 p (refl_incl p))) (psi_rec (A2 p (refl_incl p)))
       end) (A p (refl_incl p))
@@ -153,7 +153,7 @@ Proof.
   exact (fun p A => 
     (fix phi_form_rec p A :=
       match A with 
-      | Atome n => Atomeᶠ p (fun p0 _ => phi_nat p0 n)
+      | Atom n => Atomᶠ p (fun p0 _ => phi_nat p0 n)
       | And A1 A2 => Andᶠ p (fun p0 _ => phi_form_rec p0 A1) (fun p0 _ => phi_form_rec p0 A2) 
       | Implies A1 A2 => Impliesᶠ p (fun p0 _ => phi_form_rec p0 A1) (fun p0 _ => phi_form_rec p0 A2)
       end) p A 
@@ -161,17 +161,17 @@ Proof.
 Defined.
 
 (* Modèle universel *)
-Definition K0 ctx n := provable ctx (Atome n).
+Definition K0 ctx n := provable ctx (Atom n).
 
 Fixpoint reify p A : semK K0 p A -> provable p A :=
   match A with 
-    | Atome n   => (fun v => v)
+    | Atom n   => (fun v => v)
     | And A1 A2 => (fun '(v1, v2) => AndI (reify p A1 v1) (reify p A2 v2))
     | Implies A1 A2 => (fun v => ImpliesI (reify (A1 :: p) A2 (v (A1 :: p) (extend_cons_no A1 p p (id_extend p)) (reflect (A1 :: p) A1 (Ax (In_cons_yes A1 p))))))
   end 
 with reflect p A : provable p A -> semK K0 p A :=
   match A with 
-    | Atome n   => (fun t => t)
+    | Atom n   => (fun t => t)
     | And A1 A2 => (fun t => (reflect p A1 (AndE1 t), reflect p A2 (AndE2 t)))
     | Implies A1 A2 => (fun t => (fun p0 Hinclp0 a => reflect p0 A2 (ImpliesE (compatibility_extend_provable Hinclp0 t) (reify p0 A1 a))))
   end.
